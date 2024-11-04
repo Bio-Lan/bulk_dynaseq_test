@@ -41,6 +41,7 @@ Genome files and parameters.
 |-----------|-------------|------|---------|----------|--------|
 | `soloFeatures` | Quantification of different transcriptomic features. <details><summary>Help</summary><small>https://github.com/alexdobin/STAR/issues/1460  </small></details> | `string` | GeneFull_Ex50pAS |  |  |
 | `soloCellFilter` | Cell-calling method. <details><summary>Help</summary><small>https://github.com/alexdobin/STAR/blob/master/docs/STARsolo.md#cell-filtering-calling</small></details> | `string` | None |  |  |
+| `soloStrand` |  strandedness of the solo libraries | `string` | Forward |  |  |
 | `outFilterMatchNmin` | Alignment will be output only if the number of matched bases is higher than or equal to this value. <details><summary>Help</summary><small>Use default 50 to filter potential short prime sequences.</small></details> | `integer` | 50 |  |  |
 | `outSAMattributes` | Output tags in SAM/BAM. <details><summary>Help</summary><small>https://github.com/alexdobin/STAR/blob/master/docs/STARsolo.md#bam-tags</small></details> | `string` | MD NH HI AS nM CR UR CB UB GX GN sF |  |  |
 | `outReadsUnmapped` |  output of unmapped and partially mapped (i.e. mapped only one mate of a paired end read) reads in separate file(s).(None or Fastx) | `string` | None |  |  |
@@ -62,7 +63,7 @@ Genome files and parameters.
 | `umi_cutoff` | If the UMI number exceeds the threshold, it is considered a valid well and reported. | `integer` | 500 | | |
 | `gene_cutoff` | If the gene number exceeds the threshold, it is considered a valid well and reported. | `integer` | 0 | | |
 | `snp_file` | Backgroud snp file.Can be multiple files, separated by commas. If this option is set, it is valid for all wells. | `string` | | | |
-| `snp_matchfile` | Backgroud snp file for each well.<details><summary>Help</summary><small> backgroud snp file for each well, one well per line, the format is  \"well   snp_file\". Can be multiple files, separated by commas. This parameter takes precedence over snp_file. </small></details>| `string` | | | |
+| `snp_matchfile` | Backgroud snp file for each well.<details><summary>Help</summary><small> backgroud snp file for each well, one well per line, the format is  \"well,snp_file\". Can be multiple files, separated by commas. This parameter takes precedence over snp_file. </small></details>| `string` | | | |
 
 
 ## Optional modules

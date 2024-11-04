@@ -5,7 +5,7 @@
 
 ## Samplesheet input
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below. An example `samplesheet.csv` can be found in the [test data repository](https://github.com/singleron-RD/bulk_dynaseq_test_data/tree/master/bulk_dynaseq-V1).
+You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below. An example `samplesheet.csv` can be found in the [test data repository](https://github.com/singleron-RD/bulk_dynaseq_test_data/tree/main/bulk_dynaseq-V1).
 
 ```bash
 --input '[path to samplesheet file]'
@@ -35,7 +35,7 @@ manifest -m manifest.csv -f /workspaces/bulk_dynaseq_test_data/bulk_dynaseq-V1
 
 Recursively search the specified folders for fastq files and (optional) matched barcode files.
 
-`-m --manifest` Path to the manifest CSV file containing mappings between fastq file prefixes and sample names. An example `manifest.csv` can be found in the [test data repository](https://github.com/singleron-RD/bulk_dynaseq_test_data/tree/master/bulk_dynaseq-V1).
+`-m --manifest` Path to the manifest CSV file containing mappings between fastq file prefixes and sample names. An example `manifest.csv` can be found in the [test data repository](https://github.com/singleron-RD/bulk_dynaseq_test_data/tree/main/bulk_dynaseq-V1).
 
 `-f --folders` Comma-separated paths to folders to search for fastq files. If `--match` is used, all `barcode.tsv.gz` files with sample name in the full path will also be searched.
 
