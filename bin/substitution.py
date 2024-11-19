@@ -2,10 +2,14 @@
 # coding=utf8
 
 import re
+import sys
 import argparse
 
 import pysam
 import pandas as pd
+
+from __init__ import ASSAY
+import utils
 
 sorted_header=['A_to_C','A_to_G','A_to_T','C_to_A','C_to_G','C_to_T','G_to_A','G_to_C','G_to_T','T_to_A','T_to_C','T_to_G']
 
@@ -19,15 +23,19 @@ class Substitution():
     """
     def __init__(self, args):
         self.args = args
-
-        conv_bam = args.conv_bam.split(",")
-        conv_sample = pd.read_csv(args.conv_sample, index_col=0)
-        wells = conv_sample.index.to_list()
-        self.well_bam = {}
-        for i in wells:
-            temp = [j for j in conv_bam if i in j]
-            self.well_bam[i]=temp[0]
+        self.sample =args.sample
         
+        conv_bam = args.conv_bam.split(",")
+
+        conv_sample = pd.read_csv(args.conv_sample, index_col=0)
+        well_BC = conv_sample.index.to_list()
+        self.well_bam = {}
+        for well in well_BC:
+            temp = [j for j in conv_bam if well in j]
+            if len(temp) > 1:
+                sys.exit(f"ERROR:input file wrong")
+            self.well_bam[well] = temp[0]
+
         self.well_dict = {}
         #output
         self.outstat = args.sample + '.substitution.csv'
@@ -38,9 +46,15 @@ class Substitution():
             xout = self.sub_stat(for_base, rev_base, is_forward, is_reverse)
             self.well_dict[i] = xout
         
-        df = pd.DataFrame.from_dict(self.well_dict,orient='index')
+        df = pd.DataFrame.from_dict(self.well_dict,orient='index',dtype=float)
         df = df[sorted_header]
-        df.to_csv(self.outstat)
+        df1 = df.sort_values(by="T_to_C",ascending=False)
+        df1.to_csv(self.outstat)
+        
+        box_dict = df1.to_dict(orient='list')
+        bar_dict = df1.to_dict(orient="index")
+        utils.write_multiqc(box_dict, self.sample, ASSAY, "substitution.boxplot")
+        utils.write_multiqc(bar_dict, self.sample, ASSAY, "substitution.barplot")
 
     def get_sub_tag(self,bam):
         save = pysam.set_verbosity(0)
@@ -94,7 +108,6 @@ class Substitution():
                 fcov = is_forward[y]*100 / float(fbase) if float(fbase)>0 else 0
                 rcov = is_reverse[subdict[y]]*100 / float(rbase) if float(rbase)>0 else 0
                 outw[outdict[y]] = "%.3f" % (fcov + rcov)
-        
         return outw
 
 if __name__ == "__main__":
@@ -102,7 +115,7 @@ if __name__ == "__main__":
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--sample",required=True)
-    parser.add_argument("--conv_sample",required=True)
+    parser.add_argument('--conv_sample',required=True)
     parser.add_argument('--conv_bam',required=True)
     args = parser.parse_args()
 

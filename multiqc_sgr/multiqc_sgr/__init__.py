@@ -12,11 +12,11 @@ def multiqc_sgr_config():
         "bulk_dynaseq/barplot": {
             "fn": "*bulk_dynaseq.substitution.barplot.json"
         },
-        "bulk_dynaseq/labeled": {
-            "fn": "*bulk_dynaseq.quant.labeled.json"
+        "bulk_dynaseq/labeled_rate": {
+            "fn": "*bulk_dynaseq.quant.labeled_rate.json"
         },
-        "bulk_dynaseq/table": {
-            "fn": "*bulk_dynaseq.quant.table.json"
+        "bulk_dynaseq/well_inf": {
+            "fn": "*bulk_dynaseq.quant.well_inf.json"
         }
     }
     config.update_dict(config.sp, sgr_search_patterns)

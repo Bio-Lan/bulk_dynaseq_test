@@ -15,7 +15,7 @@ nextflow.enable.dsl = 2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 include { BULK_DYNASEQ            } from './workflows/bulk_dynaseq'
-include { SPLIT_FASTQ             } from './workflows/split_fastq'
+include { FASTQ_SPLIT             } from './workflows/fastq_split'
 include { PIPELINE_INITIALISATION } from './subworkflows/local/utils_nfcore_bulk_dynaseq_pipeline'
 include { PIPELINE_COMPLETION     } from './subworkflows/local/utils_nfcore_bulk_dynaseq_pipeline'
 
@@ -38,12 +38,12 @@ workflow SINGLERONRD_BULK_DYNASEQ {
     multiqc_report = BULK_DYNASEQ.out.multiqc_report
 }
 
-workflow PIPELINE_SPLITFASTQ{
+workflow PIPELINE_FASTQ_SPLIT{
     take:
     samplesheet
 
     main:
-    SPLIT_FASTQ (samplesheet)
+    FASTQ_SPLIT (samplesheet)
 }
 
 /*
@@ -67,7 +67,7 @@ workflow {
 
     // choose which workflow
     if (params.run_splitfastq){
-        PIPELINE_SPLITFASTQ(
+        PIPELINE_FASTQ_SPLIT(
             PIPELINE_INITIALISATION.out.samplesheet
         )
     } else {

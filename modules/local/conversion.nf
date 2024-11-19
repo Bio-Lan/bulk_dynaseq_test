@@ -9,8 +9,8 @@ process CONVERSION{
     tuple val(meta), path(well_bam)
 
     output:
-    tuple val(meta), path("${meta.id}/*.PosTag.bam"), emit:conv_bam
-    tuple val(meta), path("${meta.id}/*.PosTag.bam.bai"), emit:conv_bam_bai
+    tuple val(meta), path("${meta.id}/*.PosTag.bam"), emit:conv_wellbam
+    tuple val(meta), path("${meta.id}/*.PosTag.bam.bai"), emit:conv_wellbam_bai
     tuple val(meta), path("${meta.id}/*.PosTag.csv"), emit:conv_postag
     tuple val(meta), path("${meta.id}/*.snp.csv"), emit:conv_snp
 

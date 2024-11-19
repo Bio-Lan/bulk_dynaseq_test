@@ -6,18 +6,19 @@ process SUBSTITUTION{
     container "qaqlans/sgr-accura-2"
     
     input:
-    tuple val(meta), path(conv_sample), path(conv_bam,stageAs: "?/*")
+    tuple val(meta), path(conv_sample), path(conv_wellbam,stageAs: "bam_file/*")
 
     output:
-    tuple val(meta), path("*.substitution.csv"),emit:sample_subs
+    tuple val(meta), path("*.substitution.csv")
+    tuple val(meta), path("*.json"), emit: json
 
     script:
     def prefix = "${meta.id}"
-    def conv_bam = conv_bam.join(",")
+    def bamfile = conv_wellbam.join(",")
     """
     substitution.py \\
         --sample $prefix \\
         --conv_sample $conv_sample \\
-        --conv_bam $conv_bam
+        --conv_bam $bamfile
     """
 }

@@ -8,12 +8,12 @@ include { FILTER_GTF             } from '../modules/local/filter_gtf'
 include { STAR_GENOME            } from '../modules/local/star_genome'
 include { PROTOCOL_CMD           } from '../modules/local/protocol_cmd'
 include { STARSOLO               } from '../modules/local/starsolo'
+include { STARSOLO_SUMMARY       } from '../modules/local/starsolo_summary'
 include { BAM_SPLIT              } from '../modules/local/bam_split'
 include { CONVERSION             } from '../modules/local/conversion'
 include { CONVERSION_SUMMARY     } from '../modules/local/conversion_summary'
 include { SUBSTITUTION           } from '../modules/local/substitution'
 include { QUANT                  } from '../modules/local/quant'
-include { RESULT_SUMMARY         } from '../modules/local/result_summary'
 include { MULTIQC                } from '../modules/local/multiqc_sgr'
 
 include { paramsSummaryMap       } from 'plugin/nf-validation'
@@ -55,7 +55,7 @@ workflow BULK_DYNASEQ {
             params.gtf,
             params.keep_attributes
         )
-
+        
         ch_gtf = FILTER_GTF.out.filtered_gtf
         if(params.genome_name.contains('/')){
             genome_name = params.genome_name.split('/').last()
@@ -91,6 +91,13 @@ workflow BULK_DYNASEQ {
         "${projectDir}/assets/"
     )
     ch_versions = ch_versions.mix(STARSOLO.out.versions.first())
+    
+    // starsolo summary
+    ch_merge = STARSOLO.out.read_stats.join(STARSOLO.out.summary)
+    STARSOLO_SUMMARY(
+        ch_merge
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(STARSOLO_SUMMARY.out.json.collect{it[1]})
 
     // bam split
     BAM_SPLIT (
@@ -104,28 +111,25 @@ workflow BULK_DYNASEQ {
         split_bam,
     )
     ch_merge = CONVERSION.out.conv_postag.groupTuple().join(CONVERSION.out.conv_snp.groupTuple())
+
+    // conversion summary
     CONVERSION_SUMMARY(
         ch_merge
     )
 
     // substitution
-    ch_merge = CONVERSION_SUMMARY.out.conv_sample.join(CONVERSION.out.conv_bam.groupTuple())
+    ch_merge = CONVERSION_SUMMARY.out.conv_sample.join(CONVERSION.out.conv_wellbam.groupTuple())
     SUBSTITUTION(
         ch_merge
     )
+    ch_multiqc_files = ch_multiqc_files.mix(SUBSTITUTION.out.json.collect{it[1]})
 
     // quant
-    ch_merge = CONVERSION_SUMMARY.out.conv_sample.join(CONVERSION.out.conv_bam.groupTuple()).join(CONVERSION.out.conv_bam_bai.groupTuple()).join(CONVERSION.out.conv_snp.groupTuple()).join(STARSOLO.out.raw_matrix)
+    ch_merge = CONVERSION_SUMMARY.out.conv_sample.join(CONVERSION.out.conv_wellbam.groupTuple()).join(CONVERSION.out.conv_wellbam_bai.groupTuple()).join(CONVERSION.out.conv_snp.groupTuple()).join(STARSOLO.out.raw_matrix)
     QUANT(
         ch_merge
     )
-
-    //result summary
-    ch_merge = STARSOLO.out.read_stats.join(STARSOLO.out.summary).join(QUANT.out.sample_filter).join(QUANT.out.sample_raw).join(SUBSTITUTION.out.sample_subs)
-    RESULT_SUMMARY(
-        ch_merge
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(RESULT_SUMMARY.out.json.collect{it[1]})
+    ch_multiqc_files = ch_multiqc_files.mix(QUANT.out.json.collect{it[1]})
 
     // Collate and save software versions
     softwareVersionsToYAML(ch_versions)

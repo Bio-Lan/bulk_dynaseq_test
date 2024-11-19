@@ -23,8 +23,8 @@ class MultiqcModule(BaseMultiqcModule):
         stat_data = self.parse_json(self.name, "stats")
         box_data = self.parse_json(self.name, "boxplot")
         bar_data = self.parse_json(self.name, "barplot")
-        labeled_data = self.parse_json(self.name, "labeled")
-        table_data = self.parse_json(self.name, "table")
+        labeled_data = self.parse_json(self.name, "labeled_rate")
+        table_data = self.parse_json(self.name, "well_inf")
         
         if all(len(x) == 0 for x in [stat_data, box_data, bar_data, labeled_data, table_data]):
             raise ModuleNoSamplesFound
@@ -251,6 +251,7 @@ class MultiqcModule(BaseMultiqcModule):
             "title": "Barplot for Substitution per well",
             "ylab": "Nucleotide substitution rate",
             "cpswitch": False,
+            "sort_samples":False
         }
         cats = [
             {

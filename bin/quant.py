@@ -13,7 +13,7 @@ from multiprocessing import Pool
 
 import utils
 
-from __init__ import BARCODE_FILE_NAME, FEATURE_FILE_NAME, MATRIX_FILE_NAME
+from __init__ import ASSAY, BARCODE_FILE_NAME, FEATURE_FILE_NAME, MATRIX_FILE_NAME
 
 BULK_DYNASEQ_MATRIX_DIR_SUFFIX = ["raw", "labeled", "unlabeled"]
 
@@ -52,6 +52,7 @@ class Quant:
         #output
         self.dir_labeled = f"{self.matrix_dir}/{BULK_DYNASEQ_MATRIX_DIR_SUFFIX[1]}"
         self.dir_unlabeled = f"{self.matrix_dir}/{BULK_DYNASEQ_MATRIX_DIR_SUFFIX[2]}"
+        self.detail_txt = f"{self.sample}.labeled_detail.txt"
         self.rawcsv = f'{self.sample}_raw.csv'
         self.fltcsv = f'{self.sample}_filtered.csv'
 
@@ -60,7 +61,11 @@ class Quant:
         return df.index.to_list()
     
     def run(self):
-        self.dfs = self.run_quant()
+        well_dfs = self.run_quant()
+        for i in well_dfs:
+            self.totaldf = pd.concat([self.totaldf,i], axis=0)
+        self.totaldf.to_csv(self.detail_txt, sep="\t", index=False)
+
         self.split_matrix()
         self.write_csv_file()
 
@@ -109,43 +114,52 @@ class Quant:
         # get backgroud snp
         bg = Quant.background_snp(snp_file)
         # get reads with TC
-        df_total = Quant.extract_dem(bam_file, bg, sample)
-        return df_total
+        well_df = Quant.extract_dem(bam_file, bg, sample)
+        return well_df
     
     @staticmethod
     def extract_dem(bam, bg, sample):
         save = pysam.set_verbosity(0)
         bamfile = pysam.AlignmentFile(bam, 'rb')
         pysam.set_verbosity(save)
-        countarr = []
+        readdict = {}
+
         for read in bamfile.fetch():
+            cb = read.get_tag("CB")
             chro = read.reference_name
             ub = read.get_tag('UB')
             gene = read.get_tag('GX')
+            tctag = 0
+            true_tc = []
 
             if read.get_tag("ST") == "+":
                 stag = read.get_tag("TL")
             else:
                 stag = read.get_tag("AL")
+            
             if stag == '-':
                 tctag = 0
+                true_tc = stag
             else:
-                fcount = 0
                 for si in range(0, len(stag)):
                     pos = chro + '_' + str(stag[si])
-                    if pos in bg.keys():
-                        fcount += 1
-                if fcount == len(stag):
-                    tctag = 0
-                else:
-                    tctag = 1
-            countarr.append([gene, sample, ub, tctag])
-        bamfile.close()
+                    if pos not in bg.keys():
+                        true_tc.append(int(stag[si]))
+                tctag = len(true_tc)
 
-        totaldf = pd.DataFrame(countarr)
-        totaldf.columns = ['gene','Well','UMI','TC']
-        df_unique = totaldf.groupby(['gene', 'Well', 'UMI'])[['gene', 'Well', 'UMI','TC']].apply(lambda x: x.loc[x['TC'].idxmax()]).reset_index(drop=True)
-        return df_unique
+            readid = ":".join([cb, ub, gene])
+            if readid not in readdict:
+                readdict[readid] = tctag
+            else:
+                if tctag > readdict[readid]:
+                    readdict[readid] = tctag
+        bamfile.close()
+        
+        tc_df = pd.DataFrame.from_dict(readdict, orient="index", columns=["TC"])
+        tc_df = tc_df.reset_index()
+        tc_df[['Barcode', 'UMI',"geneID"]] = tc_df['index'].str.split(':', expand=True)
+        tc_df = tc_df[['Barcode', 'UMI',"geneID","TC"]]
+        return tc_df
 
     @staticmethod
     def background_snp(bgfiles):
@@ -168,22 +182,24 @@ class Quant:
         return outdict
 
     def split_matrix(self):
-        # merge matrix
-        for i in self.dfs:
-            self.totaldf = pd.concat([self.totaldf,i])
-        self.newdf = self.totaldf[self.totaldf['TC']==1]
-        self.olddf = self.totaldf[self.totaldf['TC']==0]
-        outnewdf = self.newdf.groupby(['Well', 'gene']).agg({'UMI': 'count'})
-        outolddf = self.olddf.groupby(['Well', 'gene']).agg({'UMI': 'count'})
-        
-        self.write_sparse_matrix(outnewdf, self.dir_labeled)
-        self.write_sparse_matrix(outolddf, self.dir_unlabeled)
+        self.labeled = self.totaldf[self.totaldf["TC"] > 0]
+        unlabeled = self.totaldf[self.totaldf["TC"] == 0]
+        # matrix
+        self.write_sparse_matrix(self.labeled.drop("TC", axis=1), self.dir_labeled)
+        self.write_sparse_matrix(unlabeled.drop("TC", axis=1), self.dir_unlabeled)
     
     def write_sparse_matrix(self,df,matrix_dir):
         count_matrix = self.dataframe_to_matrix(df, features=self.features.index, barcodes=self.barcodes)
         self.to_matrix_dir(count_matrix, matrix_dir)
     
-    def dataframe_to_matrix(self,df,features,barcodes,value='UMI'):
+    def dataframe_to_matrix(self, df, features, barcodes, barcode_column="Barcode", feature_column="geneID", value="UMI"):
+        if df.shape[0] > 0:
+            series_grouped = df.groupby([barcode_column, feature_column], observed=True).size()
+            series_grouped.name = value
+            df_grouped = pd.DataFrame(series_grouped)
+        else:
+            empty_matrix = scipy.sparse.coo_matrix((len(features), len(barcodes)))
+            return empty_matrix
 
         feature_index_dict = {}
         for index, gene_id in enumerate(features):
@@ -191,15 +207,16 @@ class Quant:
         barcode_index_dict = {}
         for index, barcode in enumerate(barcodes):
             barcode_index_dict[barcode] = index
-        
-        # use all barcodes
-        barcode_codes = [barcode_index_dict[barcode] for barcode in df.index.get_level_values(level=0)]
-        # use all gene_id from features even if it is not in df
-        gene_id_codes = [feature_index_dict[gene_id] for gene_id in df.index.get_level_values(level=1)]
-        mtx = scipy.sparse.coo_matrix((df[value], (gene_id_codes, barcode_codes)),
-            shape=(len(features), len(barcodes)))
 
-        return  mtx
+        # use all barcodes
+        barcode_codes = [barcode_index_dict[barcode] for barcode in df_grouped.index.get_level_values(level=0)]
+        # use all gene_id from features even if it is not in df
+        gene_id_codes = [feature_index_dict[gene_id] for gene_id in df_grouped.index.get_level_values(level=1)]
+        mtx = scipy.sparse.coo_matrix(
+            (df_grouped[value], (gene_id_codes, barcode_codes)), shape=(len(features), len(barcodes))
+        )
+
+        return mtx
     
     def to_matrix_dir(self, count_matrix, matrix_dir):
         utils.check_mkdir(dir_name=matrix_dir)
@@ -210,20 +227,55 @@ class Quant:
             scipy.io.mmwrite(f, count_matrix)
         
     def write_csv_file(self):
-        df_sum = self.totaldf.groupby('Well').agg({
+        df_sum = self.totaldf.groupby('Barcode').agg({
             'UMI': 'count',
-            'gene': 'nunique'
+            'geneID': 'nunique'
         })
-        df_new_sum = self.newdf.groupby('Well').agg({
+        df_labeled_sum = self.labeled.groupby('Barcode').agg({
             'UMI': 'count',
-            'gene': 'nunique'
+            'geneID': 'nunique'
         })
-        self.df = pd.concat([df_sum,df_new_sum], axis=1)
-        self.df.columns=['UMI','gene','labeled_UMI','labeled_gene']
-        self.df.to_csv(self.rawcsv)
+        df = pd.concat([df_sum,df_labeled_sum], axis=1)
+        df.columns=['UMI','gene','labeled_UMI','labeled_gene']
+        df = df.fillna(0)
+        df = df.astype(int)
+        df.to_csv(self.rawcsv)
 
-        self.df = self.df[ (self.df['UMI']>=self.args.umi_cutoff) & (self.df['gene']>=self.args.gene_cutoff) ]
-        self.df.to_csv(self.fltcsv)       
+        df_filter = df[ (df['UMI']>=self.args.umi_cutoff) & (df['gene']>=self.args.gene_cutoff) ]
+        df_filter.to_csv(self.fltcsv)
+
+        json_df = df_filter if df_filter.shape[0] > 0 else df
+        self.write_multiqc_json(json_df)
+    
+    def write_multiqc_json(self,df):
+        json_dict = df.to_dict(orient="index")
+        utils.write_multiqc(json_dict, self.sample, ASSAY, "quant.well_inf")
+        
+        stats = df.describe()
+        stats.columns = ['UMI','Genes','labeled_UMI','labeled_gene']
+
+        df['UMI_rate'] = df['labeled_UMI']/df['UMI']
+        df['gene_rate'] = df['labeled_gene']/df['gene']
+        labeled_rate = round( df['UMI_rate'].median() * 100,2)
+        labeled_rate2 = round( df['UMI_rate'].mean() * 100,2)
+
+        data_dict = {}
+        for item in ['UMI', 'Genes']:
+            temp = f'Median {item} across Well'
+            data_dict[temp] = int(stats.loc['50%',item])
+            temp = f'Mean {item} across Well'
+            data_dict[temp] = int(stats.loc['mean',item])
+        
+        temp = 'Median labeled rate across wells'
+        data_dict[temp] = labeled_rate
+        temp = 'Mean labeled rate across wells'
+        data_dict[temp] = labeled_rate2
+        utils.write_multiqc(data_dict, self.sample, ASSAY, "quant.stats")
+        
+        df = df.loc[:,['UMI_rate','gene_rate']]
+        df.columns = ['UMI','Gene']
+        label_dict = df.to_dict(orient="list")
+        utils.write_multiqc(label_dict, self.sample, ASSAY, "quant.labeled_rate")
 
 if __name__ == "__main__":
     """
