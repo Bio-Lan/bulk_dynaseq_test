@@ -143,7 +143,6 @@ if __name__ == "__main__":
     parser.add_argument("--sub_stats", help="substitution csv file")
     parser.add_argument("--sample_raw", help="qutan sample raw csv file")
     parser.add_argument("--sample_filter", help="qutan sample filter csv file")
-    parser.add_argument("--DRACH_display", default=3, type=int, help="how many DRACH display")
     args = parser.parse_args()
 
     Report_Summary(args).run()
