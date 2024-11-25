@@ -244,39 +244,6 @@ class Quant:
         df_filter = df[ (df['UMI']>=self.args.umi_cutoff) & (df['gene']>=self.args.gene_cutoff) ]
         df_filter.to_csv(self.fltcsv)
 
-        json_df = df_filter if df_filter.shape[0] > 0 else df
-        self.write_multiqc_json(json_df)
-    
-    def write_multiqc_json(self,df):
-        json_dict = df.to_dict(orient="index")
-        utils.write_multiqc(json_dict, self.sample, ASSAY, "quant.well_inf")
-        
-        stats = df.describe()
-        stats.columns = ['UMI','Genes','labeled_UMI','labeled_gene']
-
-        df['UMI_rate'] = df['labeled_UMI']/df['UMI']
-        df['gene_rate'] = df['labeled_gene']/df['gene']
-        labeled_rate = round( df['UMI_rate'].median() * 100,2)
-        labeled_rate2 = round( df['UMI_rate'].mean() * 100,2)
-
-        data_dict = {}
-        for item in ['UMI', 'Genes']:
-            temp = f'Median {item} across Well'
-            data_dict[temp] = int(stats.loc['50%',item])
-            temp = f'Mean {item} across Well'
-            data_dict[temp] = int(stats.loc['mean',item])
-        
-        temp = 'Median labeled rate across wells'
-        data_dict[temp] = labeled_rate
-        temp = 'Mean labeled rate across wells'
-        data_dict[temp] = labeled_rate2
-        utils.write_multiqc(data_dict, self.sample, ASSAY, "quant.stats")
-        
-        df = df.loc[:,['UMI_rate','gene_rate']]
-        df.columns = ['UMI','Gene']
-        label_dict = df.to_dict(orient="list")
-        utils.write_multiqc(label_dict, self.sample, ASSAY, "quant.labeled_rate")
-
 if __name__ == "__main__":
     """
     """

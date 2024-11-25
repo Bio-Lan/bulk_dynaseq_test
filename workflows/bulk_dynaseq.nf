@@ -8,13 +8,13 @@ include { FILTER_GTF             } from '../modules/local/filter_gtf'
 include { STAR_GENOME            } from '../modules/local/star_genome'
 include { PROTOCOL_CMD           } from '../modules/local/protocol_cmd'
 include { STARSOLO               } from '../modules/local/starsolo'
-include { STARSOLO_SUMMARY       } from '../modules/local/starsolo_summary'
 include { BAM_SPLIT              } from '../modules/local/bam_split'
 include { CONVERSION             } from '../modules/local/conversion'
 include { CONVERSION_SUMMARY     } from '../modules/local/conversion_summary'
 include { SUBSTITUTION           } from '../modules/local/substitution'
 include { QUANT                  } from '../modules/local/quant'
 include { MULTIQC                } from '../modules/local/multiqc_sgr'
+include { REPORT_SUMMARY         } from '../modules/local/report_summary'
 
 include { paramsSummaryMap       } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -91,13 +91,6 @@ workflow BULK_DYNASEQ {
         "${projectDir}/assets/"
     )
     ch_versions = ch_versions.mix(STARSOLO.out.versions.first())
-    
-    // starsolo summary
-    ch_merge = STARSOLO.out.read_stats.join(STARSOLO.out.summary)
-    STARSOLO_SUMMARY(
-        ch_merge
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(STARSOLO_SUMMARY.out.json.collect{it[1]})
 
     // bam split
     BAM_SPLIT (
@@ -122,14 +115,21 @@ workflow BULK_DYNASEQ {
     SUBSTITUTION(
         ch_merge
     )
-    ch_multiqc_files = ch_multiqc_files.mix(SUBSTITUTION.out.json.collect{it[1]})
 
     // quant
     ch_merge = CONVERSION_SUMMARY.out.conv_sample.join(CONVERSION.out.conv_wellbam.groupTuple()).join(CONVERSION.out.conv_wellbam_bai.groupTuple()).join(CONVERSION.out.conv_snp.groupTuple()).join(STARSOLO.out.raw_matrix)
     QUANT(
         ch_merge
     )
-    ch_multiqc_files = ch_multiqc_files.mix(QUANT.out.json.collect{it[1]})
+
+    // report summary
+    ch_merge = STARSOLO.out.read_stats.join(STARSOLO.out.summary)
+    ch_merge = ch_merge.join(SUBSTITUTION.out.substitution_stat)
+    ch_merge = ch_merge.join(QUANT.out.sample_raw).join(QUANT.out.sample_filter)
+    REPORT_SUMMARY(
+        ch_merge
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(REPORT_SUMMARY.out.json.collect{it[1]})
 
     // Collate and save software versions
     softwareVersionsToYAML(ch_versions)

@@ -9,8 +9,7 @@ process SUBSTITUTION{
     tuple val(meta), path(conv_sample), path(conv_wellbam,stageAs: "bam_file/*")
 
     output:
-    tuple val(meta), path("*.substitution.csv")
-    tuple val(meta), path("*.json"), emit: json
+    tuple val(meta), path("*.substitution.csv"), emit: substitution_stat
 
     script:
     def prefix = "${meta.id}"

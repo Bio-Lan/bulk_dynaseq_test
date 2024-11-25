@@ -50,11 +50,6 @@ class Substitution():
         df = df[sorted_header]
         df1 = df.sort_values(by="T_to_C",ascending=False)
         df1.to_csv(self.outstat)
-        
-        box_dict = df1.to_dict(orient='list')
-        bar_dict = df1.to_dict(orient="index")
-        utils.write_multiqc(box_dict, self.sample, ASSAY, "substitution.boxplot")
-        utils.write_multiqc(bar_dict, self.sample, ASSAY, "substitution.barplot")
 
     def get_sub_tag(self,bam):
         save = pysam.set_verbosity(0)

@@ -3,15 +3,31 @@
 import argparse
 from collections import defaultdict
 
+import os
 import pandas as pd
 
 import utils
 from __init__ import ASSAY
 
-class Result_Summary:
+class Report_Summary:
     def __init__(self, args):
+        self.sample = args.sample
         self.args = args
         self.stats = {}
+    
+    def run(self):
+        self.parse_read_stats()
+        self.parse_summary()
+        utils.write_multiqc(self.stats, self.args.sample, ASSAY, "read.stats")
+
+        # get well BC
+        df_raw = pd.read_csv(self.args.sample_raw,header=0,sep=",",index_col= 0)
+        df_filter = pd.read_csv(self.args.sample_filter,header=0,sep=",",index_col= 0)
+        df = df_filter if df_filter.shape[0] > 0 else df_raw
+        self.well_list = df.index.to_list()
+
+        self.parse_substitution_rate()
+        self.parse_quant_result(df)
 
     def parse_read_stats(self):
         dtypes = defaultdict(lambda: "int")
@@ -19,8 +35,6 @@ class Result_Summary:
         df = pd.read_csv(
             self.args.read_stats, sep="\t", header=0, index_col=0, skiprows=[1], dtype=dtypes
         )  # skip first line cb not pass whitelist
-        rbs = list(df.index)
-        umi_count = list(df["nUMIunique"])
         df = df.loc[
             :,
             [
@@ -62,7 +76,7 @@ class Result_Summary:
         }
         for k in data_dict:
             data_dict[k] = utils.get_frac(data_dict[k])
-        self.stats.update(data_dict)
+        self.stats.update(data_dict)        
 
     def parse_summary(self):
         data = utils.csv2dict(self.args.summary)
@@ -82,22 +96,18 @@ class Result_Summary:
             parsed_data[k] = int(parsed_data[k])
         self.stats.update(parsed_data)
     
-    def parse_filterCSV(self):
-        df = pd.read_csv(self.args.filter_csv,header=0,sep=",",index_col=0)
-        if df.shape[0] == 0:
-            df = pd.read_csv(self.args.raw_csv,header=0,sep=",",index_col=0)
-        table_dict = df.to_dict(orient='index')
-        utils.write_multiqc(table_dict, self.args.sample, ASSAY, "quant.table")
-
+    def parse_quant_result(self,df):
+        json_dict = df.to_dict(orient="index")
+        utils.write_multiqc(json_dict, self.sample, ASSAY, "quant.well_inf")
         
-        labeled_df = df.dropna()
-        labeled_df.loc[:,'rate'] = labeled_df.loc[:,'labeled_UMI'] / labeled_df.loc[:,'UMI']
-        labeled_rate = round( labeled_df['rate'].median() * 100,2)
-        labeled_rate2 = round( labeled_df['rate'].mean() * 100,2)
-
         stats = df.describe()
         stats.columns = ['UMI','Genes','labeled_UMI','labeled_gene']
-        
+
+        df['UMI_rate'] = df['labeled_UMI']/df['UMI']
+        df['gene_rate'] = df['labeled_gene']/df['gene']
+        labeled_rate = round( df['UMI_rate'].median() * 100,2)
+        labeled_rate2 = round( df['UMI_rate'].mean() * 100,2)
+
         data_dict = {}
         for item in ['UMI', 'Genes']:
             temp = f'Median {item} across Well'
@@ -109,38 +119,31 @@ class Result_Summary:
         data_dict[temp] = labeled_rate
         temp = 'Mean labeled rate across wells'
         data_dict[temp] = labeled_rate2
-        self.stats.update(data_dict)
-
-        df['UMI_rate'] = df['labeled_UMI'] / df['UMI']
-        df['gene_rate'] = df['labeled_gene'] / df['gene']
-        label_df = df.loc[:,['UMI_rate','gene_rate']]
-        label_df.columns = ['UMI','Gene']
-        label_dict = label_df.to_dict(orient="list")
-        utils.write_multiqc(label_dict, self.args.sample, ASSAY, "quant.labeled")
-
-    def parse_substitution(self):
-        file_path = self.args.substitution
-        df = pd.read_csv(file_path,header=0,sep=",",index_col=0)
+        utils.write_multiqc(data_dict, self.sample, ASSAY, "quant.stats")
+        
+        df = df.loc[:,['UMI_rate','gene_rate']]
+        df.columns = ['UMI','Gene']
+        label_dict = df.to_dict(orient="list")
+        utils.write_multiqc(label_dict, self.sample, ASSAY, "quant.labeled_rate")
+    
+    def parse_substitution_rate(self):
+        df = pd.read_csv(self.args.sub_stats,header = 0 ,sep=",",index_col=0)
+        df = df.loc[self.well_list,]
+        
         box_dict = df.to_dict(orient='list')
-        utils.write_multiqc(box_dict, self.args.sample, ASSAY, "substitution.boxplot")
         bar_dict = df.to_dict(orient="index")
+        utils.write_multiqc(box_dict, self.sample, ASSAY, "substitution.boxplot")
         utils.write_multiqc(bar_dict, self.args.sample, ASSAY, "substitution.barplot")
-
-    def run(self):
-        self.parse_read_stats()
-        self.parse_summary()
-        self.parse_filterCSV()
-        self.parse_substitution()
-        utils.write_multiqc(self.stats, self.args.sample, ASSAY, "reads.stats")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Result summary")
     parser.add_argument("--sample", help="sample name")
     parser.add_argument("--read_stats", help="cellReadsStats file")
     parser.add_argument("--summary", help="summary file")
-    parser.add_argument("--filter_csv", help="filtered_well information")
-    parser.add_argument("--raw_csv", help="raw well information")
-    parser.add_argument("--substitution", help="substitution result")
+    parser.add_argument("--sub_stats", help="substitution csv file")
+    parser.add_argument("--sample_raw", help="qutan sample raw csv file")
+    parser.add_argument("--sample_filter", help="qutan sample filter csv file")
+    parser.add_argument("--DRACH_display", default=3, type=int, help="how many DRACH display")
     args = parser.parse_args()
 
-    Result_Summary(args).run()
+    Report_Summary(args).run()

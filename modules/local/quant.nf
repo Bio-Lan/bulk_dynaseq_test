@@ -13,7 +13,6 @@ process QUANT{
     tuple val(meta), path("${meta.id}_raw.csv"), emit:sample_raw
     tuple val(meta), path("${meta.id}_filtered.csv"), emit:sample_filter
     tuple val(meta), path("${meta.id}.labeled_detail.txt")
-    tuple val(meta), path("*.json"), emit:json
     
     script:
     def prefix = "${meta.id}"
