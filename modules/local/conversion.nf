@@ -7,6 +7,7 @@ process CONVERSION{
 
     input:
     tuple val(meta), path(well_bam)
+    path GTF
 
     output:
     tuple val(meta), path("${meta.id}/*.PosTag.bam"), emit:conv_wellbam
@@ -20,7 +21,7 @@ process CONVERSION{
     conversion.py \\
         --sample $prefix \\
         --wellBAM $well_bam \\
-        --gtf ${params.gtf} \\
+        --gtf $GTF \\
         --conversion_type ${params.conversion_type} \\
         --basequalilty ${params.basequalilty} \\
         --snp_threshold ${params.snp_threshold} \\

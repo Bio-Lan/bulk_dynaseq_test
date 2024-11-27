@@ -102,9 +102,10 @@ workflow BULK_DYNASEQ {
     split_bam = BAM_SPLIT.out.well_bam.transpose()
     CONVERSION(
         split_bam,
+        params.gtf
     )
-    ch_merge = CONVERSION.out.conv_postag.groupTuple().join(CONVERSION.out.conv_snp.groupTuple())
 
+    ch_merge = CONVERSION.out.conv_postag.groupTuple().join(CONVERSION.out.conv_snp.groupTuple())
     // conversion summary
     CONVERSION_SUMMARY(
         ch_merge
